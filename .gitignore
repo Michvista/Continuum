@@ -1,0 +1,63 @@
+# === Environment variables ===
+.env
+.env.local
+.env.*.local
+**/.env
+!.env.example
+!**/.env.example
+
+# === Node / JS ===
+node_modules/
+dist/
+build/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.tsbuildinfo
+
+# === Python (cognee-service) ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+env/
+.cognee_system/
+*.sqlite3
+
+# === Prisma / DB ===
+prisma/dev.db
+*.db
+*.sqlite
+
+# === Redis / BullMQ ===
+dump.rdb
+
+# === Logs & temp ===
+*.log
+logs/
+tmp/
+*.tmp
+
+# === OS files ===
+.DS_Store
+Thumbs.db
+
+# === Editor ===
+.vscode/
+.idea/
+*.swp
+
+# === Secrets / keys ===
+*.pem
+*.key
+*.crt
+
+# === Docs (kept private) ===
+docs/PITCH_SCRIPT.md
+
+# === Misc ===
+coverage/
+.eslintcache

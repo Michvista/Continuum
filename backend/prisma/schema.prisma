@@ -1,0 +1,224 @@
+// Continuum data model
+// Patient = network-wide identity (not tied to one hospital's internal ID)
+// Visit   = a logged encounter at a specific institution, on a specific date
+// Fragment = one piece of evidence (note, lab result, prescription, voice note, image)
+// GraphSyncLog = tracks what has been pushed into Cognee's graph, so the demo
+//                can show "synced" vs "pending" state live.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum FragmentSourceType {
+  CLINICAL_NOTE
+  LAB_RESULT
+  PRESCRIPTION
+  VOICE_NOTE
+  SCANNED_DOCUMENT
+  TEXT_MESSAGE
+}
+
+enum SensitiveCategory {
+  NONE
+  MENTAL_HEALTH
+  REPRODUCTIVE_HEALTH
+  SUBSTANCE_USE
+  HIV_STATUS
+  INTIMATE_PARTNER_VIOLENCE
+}
+
+enum SyncStatus {
+  PENDING
+  SYNCED
+  FAILED
+}
+
+enum ReviewStatus {
+  CLEAR
+  NEEDS_REVIEW
+  UNDER_REVIEW
+  RESOLVED
+}
+
+enum ConsentVisibility {
+  VISIBLE
+  CLINICIAN_ONLY
+  EMERGENCY_ONLY
+}
+
+enum AccessGrantStatus {
+  ACTIVE
+  PENDING
+  REVOKED
+}
+
+enum AccessGrantLevel {
+  STANDARD
+  FULL
+  EMERGENCY
+}
+
+enum AuthRole {
+  PATIENT
+  CLINICIAN
+  REVIEWER
+  ADMIN
+  NURSE
+}
+
+model Patient {
+  id           String   @id @default(cuid())
+  displayName  String
+  // The patient consents to be enrolled in the network at all (opt-in to the
+  // system). Once enrolled, the record is append-only and network-readable —
+  // there is no per-hospital hiding, since selective hiding is a clinical
+  // safety risk, not a privacy feature, in a system other providers rely on.
+  consentedAt  DateTime @default(now())
+  createdAt    DateTime @default(now())
+  visits       Visit[]
+  fragments    Fragment[]
+  consentProfile ConsentProfile?
+  consentRules  ConsentRule[]
+  accessGrants  AccessGrant[]
+  accessAudits  AccessAudit[]
+  authUser      AuthUser?
+}
+
+model Visit {
+  id              String     @id @default(cuid())
+  patient         Patient    @relation(fields: [patientId], references: [id])
+  patientId       String
+  institutionName String
+  visitDate       DateTime
+  notes           String?
+  fragments       Fragment[]
+  createdAt       DateTime   @default(now())
+}
+
+model Fragment {
+  id                String             @id @default(cuid())
+  patient           Patient            @relation(fields: [patientId], references: [id])
+  patientId         String
+  visit             Visit?             @relation(fields: [visitId], references: [id])
+  visitId           String?
+
+  // Provenance — every fact is source-tagged, never presented as unattributed truth
+  originInstitution String
+  originAuthor      String?
+
+  sourceType        FragmentSourceType
+  content           String             // raw text, or transcription of voice note
+  sourceFileUrl      String?           // scanned doc / photo proof, e.g. Cloudinary URL
+
+  sensitiveCategory SensitiveCategory  @default(NONE)
+
+  // Conflict surfacing: if this fragment contradicts another (e.g. differing
+  // dosage), flag it instead of silently merging.
+  conflictsWithId   String?
+
+  // Human review workflow for conflict-adjacent fragments.
+  reviewStatus      ReviewStatus      @default(CLEAR)
+  // Clinician's explanation of how this conflict was resolved.
+  resolutionNote    String?
+
+  // Cognee sync state, so the UI can show "ingested into the graph" live
+  syncStatus        SyncStatus         @default(PENDING)
+  syncError         String?
+
+  createdAt         DateTime           @default(now())
+}
+
+model GraphSyncLog {
+  id          String     @id @default(cuid())
+  fragmentId  String
+  patientId   String
+  status      SyncStatus
+  detail      String?
+  createdAt   DateTime   @default(now())
+}
+
+model ConsentProfile {
+  id                   String   @id @default(cuid())
+  patient              Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patientId            String   @unique
+  shareWithCareTeam     Boolean  @default(true)
+  allowEmergencyOverride Boolean @default(true)
+  patientNote          String?
+  updatedAt            DateTime @updatedAt
+  createdAt            DateTime @default(now())
+}
+
+model ConsentRule {
+  id          String            @id @default(cuid())
+  patient     Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patientId   String
+  category    SensitiveCategory
+  visibility  ConsentVisibility @default(VISIBLE)
+  note        String?
+  updatedAt   DateTime          @updatedAt
+  createdAt   DateTime          @default(now())
+
+  @@unique([patientId, category])
+}
+
+model AccessGrant {
+  id           String            @id @default(cuid())
+  patient      Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patientId    String
+  institutionName String
+  status       AccessGrantStatus @default(ACTIVE)
+  level        AccessGrantLevel  @default(STANDARD)
+  grantedBy    String?
+  reason       String?
+  expiresAt    DateTime?
+  updatedAt    DateTime          @updatedAt
+  createdAt    DateTime          @default(now())
+
+  @@index([patientId, institutionName])
+}
+
+model AccessAudit {
+  id             String         @id @default(cuid())
+  patient        Patient        @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patientId      String
+  institutionName String
+  actorName      String
+  role           String
+  action         String
+  reason         String?
+  category       SensitiveCategory?
+  emergency      Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+
+  @@index([patientId, createdAt])
+}
+
+model AuthUser {
+  id             String       @id @default(cuid())
+  email          String       @unique
+  displayName    String
+  role           AuthRole
+  institutionName String?
+  patient        Patient?     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patientId      String?      @unique
+  sessions       AuthSession[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model AuthSession {
+  id         String    @id @default(cuid())
+  user       AuthUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+}
