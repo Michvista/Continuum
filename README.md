@@ -522,3 +522,10 @@ questions with answers) written to be said out loud, not read off a slide.
 ## Consent quick note
 
 The patient portal at `http://localhost:5173/portal` now stores real consent state in Postgres. Patients can mark categories as `VISIBLE`, `CLINICIAN_ONLY`, or `EMERGENCY_ONLY`, but clinicians still have an audited break-glass path for care-critical information. That is intentional: hidden from the patient portal does not mean hidden from the care team when the case demands it.
+
+## Vercel note
+
+If you host the frontend on Vercel, set the project root to `frontend/` so
+Vercel reads [frontend/vercel.json](</C:/Users/USER/Desktop/hackathon/continuum/frontend/vercel.json>).
+That rewrite keeps client-side routes like `/portal` and `/login` from
+404ing on refresh.
