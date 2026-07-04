@@ -12,7 +12,19 @@ import { uploadsRouter } from "./routes/uploads";
 import { resyncRouter } from "./routes/resync";
 
 const app = express();
-app.use(cors()); 
+
+const allowedOrigins = (process.env.CORS_ORIGIN ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: allowedOrigins.length > 0 ? allowedOrigins : true,
+    methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+);
 app.use(express.json({ limit: "5mb" }));
 app.use(morgan("dev"));
 
