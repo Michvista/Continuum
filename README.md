@@ -13,6 +13,7 @@ Built for the [WeMakeDevs × Cognee Hackathon](https://www.wemakedevs.org/hackat
 (continuity of care across fragmented systems, especially relevant to
 under-resourced clinics and patients who see a different provider every visit).
 
+Built with the help of AI assistants: Codex 
 ---
 
 ## The demo, in one sentence
